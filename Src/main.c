@@ -35,6 +35,13 @@
 #define LR_VALUE				 0xFFFFFFFD
 #define MAX_CORE_REGISTERS       13
 #define RX_DUMMY_FRAME_VALUE	 0
+#define USGFAULTENA				 18
+#define BUSFAULTENA				 17
+#define MEMFAULTENA				 16
+
+#define ZERO					 0
+#define ONE						 1
+#define TWO						 2
 
 /* Function prototypes section*/
 void RTOS_task1Handler(void);
@@ -106,23 +113,25 @@ void RTOS_task4Handler(void)
 
 void RTOS_initSystickTimer(uint32_t tick_hz)
 {
-	uint32_t *pSRVR = (uint32_t*) 0xE000E014;
-	uint32_t *pSCSR = (uint32_t*) 0xE000E010;
+	uint32_t *pSRVR = (uint32_t*)0xE000E014;
+	uint32_t *pSCSR = (uint32_t*)0xE000E010;
     /* Calculation of reload value */
     uint32_t count_value = (SYSTICK_TIM_CLK/tick_hz) - 1;
     /* Clear the value of SVR */
     *pSRVR &= ~(0x00FFFFFFFF);
     /* Load the value in to SVR */
     *pSRVR |= count_value;
-    /* Do some settings */
-    *pSCSR |= ( 1 << 1);  //Enables SysTick exception request:
-    *pSCSR |= ( 1 << 2);  //Indicates the clock source, processor clock source
-    *pSCSR |= ( 1 << 0);  //enables the counter
+    /* Enable SysTick exception request */
+    *pSCSR |= ( 1 << ONE);
+    /* Indicate the clock source: processor clock source */
+    *pSCSR |= ( 1 << TWO);
+    /* Enable the counter */
+    *pSCSR |= ( 1 << ZERO);
 }
 
-__attribute__((naked)) void RTOS_initSchedulerStack(uint32_t sched_top_of_stack)
+__attribute__((naked)) void RTOS_initSchedulerStack(uint32_t schedTopOfStack)
 {
-     __asm volatile("MSR MSP,%0": :  "r" (sched_top_of_stack)  :   );
+     __asm volatile("MSR MSP,%0": :  "r" (schedTopOfStack)  :   );
      __asm volatile("BX LR");
 }
 
@@ -200,9 +209,9 @@ __attribute__((naked)) void SysTick_Handler(void)
 void RTOS_enableProcessorFaults(void)
 {
 	uint32_t *pSHCSR = (uint32_t*)0xE000ED24;
-	*pSHCSR |= ( 1 << 16);
-	*pSHCSR |= ( 1 << 17);
-	*pSHCSR |= ( 1 << 18);
+	*pSHCSR |= ( 1 << MEMFAULTENA);
+	*pSHCSR |= ( 1 << BUSFAULTENA);
+	*pSHCSR |= ( 1 << USGFAULTENA);
 }
 
 void HardFault_Handler(void)

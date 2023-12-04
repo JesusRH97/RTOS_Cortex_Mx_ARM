@@ -10,6 +10,7 @@
 /* Include section */
 #include <stdio.h>
 #include <stdint.h>
+#include "led.h"
 
 /* Define section */
 #define SIZE_TASK_STACK          1024U
@@ -71,6 +72,7 @@ int main(void)
 	taskHandlers[2] = (uint32_t) RTOS_task3Handler;
 	taskHandlers[3] = (uint32_t) RTOS_task4Handler;
 	RTOS_initSchedulerStack(SCHED_STACK_START);
+	LED_initAll();
 	RTOS_initSystickTimer(TICK_HZ);
 	RTOS_switchToPsp();
 	RTOS_initTasksStack();
@@ -83,7 +85,10 @@ void RTOS_task1Handler(void)
 {
 	while(1)
 	{
-		printf("Running task 1\n");
+		LED_setOn(LED_GREEN);
+		LED_delay(DELAY_COUNT_1S);
+		LED_setOff(LED_GREEN);
+		LED_delay(DELAY_COUNT_1S);
 	}
 }
 
@@ -91,7 +96,10 @@ void RTOS_task2Handler(void)
 {
 	while(1)
 	{
-		printf("Running task 2\n");
+		LED_setOn(LED_ORANGE);
+		LED_delay(DELAY_COUNT_500MS);
+		LED_setOff(LED_ORANGE);
+		LED_delay(DELAY_COUNT_500MS);
 	}
 }
 
@@ -99,7 +107,10 @@ void RTOS_task3Handler(void)
 {
 	while(1)
 	{
-		printf("Running task 3\n");
+		LED_setOn(LED_BLUE);
+		LED_delay(DELAY_COUNT_250MS);
+		LED_setOff(LED_BLUE);
+		LED_delay(DELAY_COUNT_250MS);
 	}
 }
 
@@ -107,7 +118,10 @@ void RTOS_task4Handler(void)
 {
 	while(1)
 	{
-		printf("Running task 4\n");
+		LED_setOn(LED_RED);
+		LED_delay(DELAY_COUNT_125MS);
+		LED_setOff(LED_RED);
+		LED_delay(DELAY_COUNT_125MS);
 	}
 }
 

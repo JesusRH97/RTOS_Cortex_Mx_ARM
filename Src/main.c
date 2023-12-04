@@ -74,37 +74,33 @@ int main(void)
 
 void RTOS_task1Handler(void)
 {
-	printf("Running task 1\n");
 	while(1)
 	{
-
+		printf("Running task 1\n");
 	}
 }
 
 void RTOS_task2Handler(void)
 {
-	printf("Running task 2\n");
 	while(1)
 	{
-
+		printf("Running task 2\n");
 	}
 }
 
 void RTOS_task3Handler(void)
 {
-	printf("Running task 3\n");
 	while(1)
 	{
-
+		printf("Running task 3\n");
 	}
 }
 
 void RTOS_task4Handler(void)
 {
-	printf("Running task 4\n");
 	while(1)
 	{
-
+		printf("Running task 4\n");
 	}
 }
 

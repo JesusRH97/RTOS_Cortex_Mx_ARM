@@ -30,8 +30,9 @@
 #define TICK_HZ 				 1000U
 #define HSI_CLOCK         		 16000000U
 #define SYSTICK_TIM_CLK   		 HSI_CLOCK
+#define TASK_READY_STATE  		 0x00
+#define TASK_BLOCKED_STATE  	 0xFF
 
-#define MAX_TASKS			     4
 #define XPSR_VALUE				 0x01000000
 #define LR_VALUE				 0xFFFFFFFD
 #define MAX_CORE_REGISTERS       13
@@ -53,29 +54,45 @@ void RTOS_task4Handler(void);
 void RTOS_initSystickTimer(uint32_t tick_hz);
 __attribute__((naked)) void RTOS_initSchedulerStack(uint32_t sched_top_of_stack);
 void RTOS_initTasksStack(void);
+void RTOS_initTaskControlBlock(void);
 void RTOS_enableProcessorFaults(void);
 __attribute__((naked)) void RTOS_switchToPsp(void);
 uint32_t RTOS_getPspValue(void);
 void RTOS_setPspValue(uint32_t currentPspAddress);
 void RTOS_updateNextTask(void);
 
+/* Typedef section */
+typedef struct
+{
+	uint32_t 	pspValue;
+	uint32_t 	blockVount;
+	uint8_t  	currentState;
+	void 		(*taskHandler)(void);
+}TaskControlBlock_t;
+
+typedef enum
+{
+	TASK_ONE = 0,
+	TASK_TWO,
+	TASK_THREE,
+	TASK_FOUR,
+	MAX_TASKS
+}ListsOfTasks_t;
+
 /* Global variables section */
 uint32_t pspOfTasks[MAX_TASKS] = {T1_STACK_START, T2_STACK_START, T3_STACK_START, T4_STACK_START};
-uint32_t taskHandlers[MAX_TASKS];
-uint8_t currentTask;
+TaskControlBlock_t userTasks[MAX_TASKS];
+uint8_t currentTask = 0;
 
 int main(void)
 {
 	RTOS_enableProcessorFaults();
-	taskHandlers[0] = (uint32_t) RTOS_task1Handler;
-	taskHandlers[1] = (uint32_t) RTOS_task2Handler;
-	taskHandlers[2] = (uint32_t) RTOS_task3Handler;
-	taskHandlers[3] = (uint32_t) RTOS_task4Handler;
 	RTOS_initSchedulerStack(SCHED_STACK_START);
+	RTOS_initTaskControlBlock();
+	RTOS_initTasksStack();
 	LED_initAll();
 	RTOS_initSystickTimer(TICK_HZ);
 	RTOS_switchToPsp();
-	RTOS_initTasksStack();
 	/* Start from first task */
 	RTOS_task1Handler();
 	for(;;);
@@ -151,12 +168,12 @@ __attribute__((naked)) void RTOS_initSchedulerStack(uint32_t schedTopOfStack)
 
 uint32_t RTOS_getPspValue(void)
 {
-	return pspOfTasks[currentTask];
+	return userTasks[currentTask].pspValue;
 }
 
 void RTOS_setPspValue(uint32_t currentPspAddress)
 {
-	pspOfTasks[currentTask] = currentPspAddress;
+	userTasks[currentTask].pspValue = currentPspAddress;
 }
 
 void RTOS_updateNextTask(void)
@@ -179,17 +196,33 @@ __attribute__((naked)) void RTOS_switchToPsp(void)
 	__asm volatile("BX LR");
 }
 
+void RTOS_initTaskControlBlock(void)
+{
+	userTasks[TASK_ONE].currentState = TASK_READY_STATE;
+	userTasks[TASK_TWO].currentState = TASK_READY_STATE;
+	userTasks[TASK_THREE].currentState = TASK_READY_STATE;
+	userTasks[TASK_FOUR].currentState = TASK_READY_STATE;
+	userTasks[TASK_ONE].taskHandler = RTOS_task1Handler;
+	userTasks[TASK_TWO].taskHandler = RTOS_task2Handler;
+	userTasks[TASK_THREE].taskHandler = RTOS_task3Handler;
+	userTasks[TASK_FOUR].taskHandler = RTOS_task4Handler;
+	userTasks[TASK_ONE].pspValue = T1_STACK_START;
+	userTasks[TASK_TWO].pspValue = T2_STACK_START;
+	userTasks[TASK_THREE].pspValue = T3_STACK_START;
+	userTasks[TASK_FOUR].pspValue = T4_STACK_START;
+}
+
 void RTOS_initTasksStack(void)
 {
 	uint32_t* pPSP;
 	for (uint8_t iTask = 0; iTask < MAX_TASKS; iTask++)
 	{
-		pPSP = (uint32_t*) pspOfTasks[iTask];
+		pPSP = (uint32_t*) userTasks[iTask].pspValue;
 		/* Stack model full descending */
 		pPSP--;
 		*pPSP = XPSR_VALUE;
 		pPSP--;
-		*pPSP = (uint32_t) taskHandlers[iTask];
+		*pPSP = (uint32_t) userTasks[iTask].taskHandler;
 		pPSP--;
 		*pPSP = LR_VALUE;
 
@@ -199,7 +232,7 @@ void RTOS_initTasksStack(void)
 			*pPSP = RX_DUMMY_FRAME_VALUE;
 		}
 		/* Store the final value of PSP for each task to return them later */
-		pspOfTasks[iTask] = (uint32_t) pPSP;
+		userTasks[iTask].pspValue = (uint32_t)pPSP;
 	}
 }
 

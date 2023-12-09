@@ -22,6 +22,5 @@
 void LED_initAll(void);
 void LED_setOn(uint8_t ledNo);
 void LED_setOff(uint8_t ledNo);
-void LED_delay(uint32_t count);
 
 #endif /* LED_H_ */

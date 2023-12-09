@@ -15,6 +15,8 @@
 /* Define section */
 #define SIZE_TASK_STACK          1024U
 #define SIZE_SCHED_STACK         1024U
+#define INTERRUPT_DISABLE()  	 do{__asm volatile ("MOV R0,#0x1"); asm volatile("MSR PRIMASK,R0"); } while(0)
+#define INTERRUPT_ENABLE()  	 do{__asm volatile ("MOV R0,#0x0"); asm volatile("MSR PRIMASK,R0"); } while(0)
 
 #define SRAM_START               0x20000000U
 #define SIZE_SRAM                ((128) * (1024))
@@ -30,7 +32,7 @@
 #define TICK_HZ 				 1000U
 #define HSI_CLOCK         		 16000000U
 #define SYSTICK_TIM_CLK   		 HSI_CLOCK
-#define TASK_READY_STATE  		 0x00
+#define TASK_RUNNING_STATE  	 0x00
 #define TASK_BLOCKED_STATE  	 0xFF
 
 #define XPSR_VALUE				 0x01000000
@@ -40,6 +42,7 @@
 #define USGFAULTENA				 18
 #define BUSFAULTENA				 17
 #define MEMFAULTENA				 16
+#define PENDSVSET				 28
 
 #define ZERO					 0
 #define ONE						 1
@@ -60,19 +63,25 @@ __attribute__((naked)) void RTOS_switchToPsp(void);
 uint32_t RTOS_getPspValue(void);
 void RTOS_setPspValue(uint32_t currentPspAddress);
 void RTOS_updateNextTask(void);
+void RTOS_updateGlobalTickCount(void);
+void RTOS_taskDelay(uint32_t tickCount);
+void RTOS_unblockTasks(void);
+void RTOS_schedule(void);
+void RTOS_idleTask(void);
 
 /* Typedef section */
 typedef struct
 {
 	uint32_t 	pspValue;
-	uint32_t 	blockVount;
+	uint32_t 	blockCount;
 	uint8_t  	currentState;
 	void 		(*taskHandler)(void);
 }TaskControlBlock_t;
 
 typedef enum
 {
-	TASK_ONE = 0,
+	IDLE_TASK = 0,
+	TASK_ONE,
 	TASK_TWO,
 	TASK_THREE,
 	TASK_FOUR,
@@ -80,9 +89,9 @@ typedef enum
 }ListsOfTasks_t;
 
 /* Global variables section */
-uint32_t pspOfTasks[MAX_TASKS] = {T1_STACK_START, T2_STACK_START, T3_STACK_START, T4_STACK_START};
 TaskControlBlock_t userTasks[MAX_TASKS];
-uint8_t currentTask = 0;
+uint8_t currentTask = TASK_ONE;
+uint32_t globalTickCount = 0;
 
 int main(void)
 {
@@ -98,14 +107,19 @@ int main(void)
 	for(;;);
 }
 
+void RTOS_idleTask(void)
+{
+	while(1);
+}
+
 void RTOS_task1Handler(void)
 {
 	while(1)
 	{
 		LED_setOn(LED_GREEN);
-		LED_delay(DELAY_COUNT_1S);
+		RTOS_taskDelay(1000);
 		LED_setOff(LED_GREEN);
-		LED_delay(DELAY_COUNT_1S);
+		RTOS_taskDelay(1000);
 	}
 }
 
@@ -114,9 +128,9 @@ void RTOS_task2Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_ORANGE);
-		LED_delay(DELAY_COUNT_500MS);
+		RTOS_taskDelay(500);
 		LED_setOff(LED_ORANGE);
-		LED_delay(DELAY_COUNT_500MS);
+		RTOS_taskDelay(500);
 	}
 }
 
@@ -125,9 +139,9 @@ void RTOS_task3Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_BLUE);
-		LED_delay(DELAY_COUNT_250MS);
+		RTOS_taskDelay(250);
 		LED_setOff(LED_BLUE);
-		LED_delay(DELAY_COUNT_250MS);
+		RTOS_taskDelay(250);
 	}
 }
 
@@ -136,9 +150,9 @@ void RTOS_task4Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_RED);
-		LED_delay(DELAY_COUNT_125MS);
+		RTOS_taskDelay(125);
 		LED_setOff(LED_RED);
-		LED_delay(DELAY_COUNT_125MS);
+		RTOS_taskDelay(125);
 	}
 }
 
@@ -178,9 +192,21 @@ void RTOS_setPspValue(uint32_t currentPspAddress)
 
 void RTOS_updateNextTask(void)
 {
-	/* Round Robin algorithm */
-	currentTask++;
-	currentTask %= MAX_TASKS;
+	uint8_t currentState = TASK_BLOCKED_STATE;
+	for(uint8_t iTask = 0; iTask < MAX_TASKS; iTask++)
+	{
+		currentTask++;
+		currentTask %= MAX_TASKS;
+		currentState = userTasks[currentTask].currentState;
+		if(currentState == TASK_RUNNING_STATE && currentTask != IDLE_TASK)
+		{
+			break;
+		}
+	}
+	if(currentState == TASK_BLOCKED_STATE)
+	{
+		currentTask = IDLE_TASK;
+	}
 }
 
 __attribute__((naked)) void RTOS_switchToPsp(void)
@@ -198,14 +224,20 @@ __attribute__((naked)) void RTOS_switchToPsp(void)
 
 void RTOS_initTaskControlBlock(void)
 {
-	userTasks[TASK_ONE].currentState = TASK_READY_STATE;
-	userTasks[TASK_TWO].currentState = TASK_READY_STATE;
-	userTasks[TASK_THREE].currentState = TASK_READY_STATE;
-	userTasks[TASK_FOUR].currentState = TASK_READY_STATE;
+	/* Set the initial state of each task */
+	userTasks[IDLE_TASK].currentState = TASK_RUNNING_STATE;
+	userTasks[TASK_ONE].currentState = TASK_RUNNING_STATE;
+	userTasks[TASK_TWO].currentState = TASK_RUNNING_STATE;
+	userTasks[TASK_THREE].currentState = TASK_RUNNING_STATE;
+	userTasks[TASK_FOUR].currentState = TASK_RUNNING_STATE;
+	/* Set the initial PC of each task */
+	userTasks[IDLE_TASK].taskHandler = RTOS_idleTask;
 	userTasks[TASK_ONE].taskHandler = RTOS_task1Handler;
 	userTasks[TASK_TWO].taskHandler = RTOS_task2Handler;
 	userTasks[TASK_THREE].taskHandler = RTOS_task3Handler;
 	userTasks[TASK_FOUR].taskHandler = RTOS_task4Handler;
+	/* Set the initial PSP value of each task */
+	userTasks[IDLE_TASK].pspValue = IDLE_STACK_START;
 	userTasks[TASK_ONE].pspValue = T1_STACK_START;
 	userTasks[TASK_TWO].pspValue = T2_STACK_START;
 	userTasks[TASK_THREE].pspValue = T3_STACK_START;
@@ -225,7 +257,6 @@ void RTOS_initTasksStack(void)
 		*pPSP = (uint32_t) userTasks[iTask].taskHandler;
 		pPSP--;
 		*pPSP = LR_VALUE;
-
 		for (uint8_t iRx = 0; iRx < MAX_CORE_REGISTERS; iRx++)
 		{
 			pPSP--;
@@ -236,7 +267,52 @@ void RTOS_initTasksStack(void)
 	}
 }
 
-__attribute__((naked)) void SysTick_Handler(void)
+void RTOS_schedule(void)
+{
+	uint32_t* pICSR = (uint32_t*)0xE000ED04;
+	*pICSR |= 1 << PENDSVSET;
+}
+
+void RTOS_taskDelay(uint32_t tickCount)
+{
+	INTERRUPT_DISABLE();
+	if(currentTask != IDLE_TASK)
+	{
+		userTasks[currentTask].blockCount = globalTickCount + tickCount;
+		userTasks[currentTask].currentState = TASK_BLOCKED_STATE;
+		RTOS_schedule();
+	}
+	INTERRUPT_ENABLE();
+}
+
+void RTOS_updateGlobalTickCount(void)
+{
+	globalTickCount++;
+}
+
+void RTOS_unblockTasks(void)
+{
+	for(uint8_t iTask = TASK_ONE; iTask < MAX_TASKS; iTask++)
+	{
+		if(userTasks[iTask].currentState != TASK_RUNNING_STATE)
+		{
+			if(userTasks[iTask].blockCount == globalTickCount)
+			{
+				userTasks[iTask].currentState = TASK_RUNNING_STATE;
+			}
+		}
+	}
+}
+
+void SysTick_Handler(void)
+{
+	uint32_t *pICSR = (uint32_t*)0xE000ED04;
+	RTOS_updateGlobalTickCount();
+	RTOS_unblockTasks();
+	*pICSR |= 1 << PENDSVSET;
+}
+
+__attribute__((naked)) void PendSV_Handler(void)
 {
 	/* Save the context of current task */
 	__asm volatile("MRS R0, PSP");

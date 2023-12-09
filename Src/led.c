@@ -1,11 +1,6 @@
 #include <stdint.h>
 #include "led.h"
 
-void LED_delay(uint32_t count)
-{
-  for(uint32_t i = 0 ; i < count ; i++);
-}
-
 void LED_initAll(void)
 {
 	uint32_t *pRccAhb1enr = (uint32_t*)0x40023830;

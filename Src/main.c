@@ -117,9 +117,9 @@ void RTOS_task1Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_GREEN);
-		RTOS_taskDelay(1000);
+		RTOS_taskDelay(DELAY_COUNT_1S);
 		LED_setOff(LED_GREEN);
-		RTOS_taskDelay(1000);
+		RTOS_taskDelay(DELAY_COUNT_1S);
 	}
 }
 
@@ -128,9 +128,9 @@ void RTOS_task2Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_ORANGE);
-		RTOS_taskDelay(500);
+		RTOS_taskDelay(DELAY_COUNT_500MS);
 		LED_setOff(LED_ORANGE);
-		RTOS_taskDelay(500);
+		RTOS_taskDelay(DELAY_COUNT_500MS);
 	}
 }
 
@@ -139,9 +139,9 @@ void RTOS_task3Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_BLUE);
-		RTOS_taskDelay(250);
+		RTOS_taskDelay(DELAY_COUNT_250MS);
 		LED_setOff(LED_BLUE);
-		RTOS_taskDelay(250);
+		RTOS_taskDelay(DELAY_COUNT_250MS);
 	}
 }
 
@@ -150,9 +150,9 @@ void RTOS_task4Handler(void)
 	while(1)
 	{
 		LED_setOn(LED_RED);
-		RTOS_taskDelay(125);
+		RTOS_taskDelay(DELAY_COUNT_125MS);
 		LED_setOff(LED_RED);
-		RTOS_taskDelay(125);
+		RTOS_taskDelay(DELAY_COUNT_125MS);
 	}
 }
 
